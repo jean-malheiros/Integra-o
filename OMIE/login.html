@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de login</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-dark: #0D0B59;
+            --primary-accent: #F25C05;
+            --secondary-accent: #4A90E2;
+            --text-light: #F8F9FA;
+            --text-dark: #2D3436;
+            --bg-gradient: linear-gradient(135deg, var(--primary-dark) 0%, #1A237E 100%);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Lato', sans-serif;
+            min-height: 100vh;
+            background: var(--bg-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 3rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            width: 100%;
+            max-width: 480px;
+            transform: translateY(0);
+            opacity: 0;
+            animation: slideUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+
+        @keyframes slideUp {
+            to {
+                opacity: 1;
+                transform: translateY(-20px);
+            }
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 2.5rem;
+            transition: transform 0.3s ease;
+        }
+
+        .logo img {
+            width: 220px;
+            height: auto;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
+        }
+
+        h2 {
+            font-family: 'Montserrat', sans-serif;
+            color: var(--primary-dark);
+            text-align: center;
+            margin-bottom: 2rem;
+            font-size: 1.8rem;
+            position: relative;
+        }
+
+        h2::after {
+            content: '';
+            display: block;
+            width: 60px;
+            height: 3px;
+            background: var(--primary-accent);
+            margin: 1rem auto 0;
+            border-radius: 2px;
+        }
+
+        .form-group {
+            margin-bottom: 1.8rem;
+            position: relative;
+        }
+
+        input {
+            width: 100%;
+            padding: 1rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary-accent);
+            box-shadow: 0 0 12px rgba(242,92,5,0.2);
+        }
+
+        button {
+            width: 100%;
+            padding: 1rem;
+            background: var(--primary-accent);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            background: #d45104;
+            transform: translateY(-2px);
+        }
+
+        .security-info {
+            text-align: center;
+            margin-top: 2rem;
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        @media (max-width: 480px) {
+            .login-container {
+                padding: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        
+        <h2>Acesso Seguro</h2>
+        
+        <form id="loginForm">
+            <div class="form-group">
+                <input type="text" 
+                       id="username" 
+                       placeholder="Usuário"
+                       required>
+            </div>
+            
+            <div class="form-group">
+                <input type="password" 
+                       id="password" 
+                       placeholder="Senha"
+                       required>
+            </div>
+            
+            <button type="submit">Acessar</button>
+        </form>
+    </div>
+
+    <script>
+        const CRYPTO_CONFIG = {
+            iterations: 100000,
+            hash: 'SHA-256',
+            keyLength: 256
+        };
+
+        async function initializeSecurity() {
+            if (!localStorage.getItem('coprelAuth')) {
+                await createInitialCredentials();
+            }
+        }
+
+        async function createInitialCredentials() {
+            const salt = crypto.getRandomValues(new Uint8Array(16));
+            const storedData = {
+                usernameHash: await hashData('Coprel'),
+                keyMaterial: await deriveKey('C0pr3l*', salt),
+                salt: arrayBufferToBase64(salt)
+            };
+            localStorage.setItem('coprelAuth', JSON.stringify(storedData));
+        }
+
+        async function hashData(data) {
+            const encoder = new TextEncoder();
+            const buffer = await crypto.subtle.digest('SHA-256', encoder.encode(data));
+            return arrayBufferToBase64(buffer);
+        }
+
+        async function deriveKey(password, salt) {
+            const encoder = new TextEncoder();
+            const baseKey = await crypto.subtle.importKey(
+                'raw',
+                encoder.encode(password),
+                {name: 'PBKDF2'},
+                false,
+                ['deriveKey']
+            );
+
+            const derivedKey = await crypto.subtle.deriveKey(
+                {
+                    name: 'PBKDF2',
+                    salt: salt,
+                    iterations: CRYPTO_CONFIG.iterations,
+                    hash: CRYPTO_CONFIG.hash
+                },
+                baseKey,
+                {name: 'AES-GCM', length: CRYPTO_CONFIG.keyLength},
+                true,
+                ['encrypt', 'decrypt']
+            );
+
+            return arrayBufferToBase64(await crypto.subtle.exportKey('raw', derivedKey));
+        }
+
+        function arrayBufferToBase64(buffer) {
+            return btoa(String.fromCharCode(...new Uint8Array(buffer)));
+        }
+
+        function base64ToArrayBuffer(base64) {
+            const binary = atob(base64);
+            const buffer = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                buffer[i] = binary.charCodeAt(i);
+            }
+            return buffer;
+        }
+
+        async function validateCredentials(username, password) {
+            try {
+                const storedData = JSON.parse(localStorage.getItem('coprelAuth'));
+                const currentUserHash = await hashData(username);
+                
+                if (currentUserHash !== storedData.usernameHash) return false;
+                
+                const salt = base64ToArrayBuffer(storedData.salt);
+                const currentKey = await deriveKey(password, salt);
+                
+                return currentKey === storedData.keyMaterial;
+            } catch (error) {
+                console.error('Erro na validação:', error);
+                return false;
+            }
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await initializeSecurity();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            if (await validateCredentials(username, password)) {
+                alert('Login bem-sucedido!\nRedirecionando...');
+                window.location.href = "Integracao.html";
+            } else {
+                alert('Credenciais inválidas!');
+            }
+        });
+    </script>
+</body>
+</html>
